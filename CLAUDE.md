@@ -58,18 +58,6 @@ Two files do all the work:
 `setup-claude-work.sh` / `setup-claude-home.sh` are one-line wrappers that just
 call `setup-claude.sh` with fixed arguments.
 
-- **`share-claude-config.sh`** — opt-in config sharing across profiles, modeled
-  on how [jean-claude](https://github.com/MikeVeerman/jean-claude) syncs Claude
-  Code's config: it moves a fixed set of known-safe files
-  (`claude_desktop_config.json`, `extensions-blocklist.json`,
-  `git-worktrees.json`, `cowork-enabled-cli-ops.json`) out of each named
-  profile's data dir into `~/.claude-desktop-shared/` and symlinks them back,
-  so editing one from any linked profile updates all the others. Deliberately
-  excludes anything account-specific (`config.json`'s OAuth token cache,
-  `buddy-tokens.json`, `ant-did`, cookies/session/local storage,
-  `claude-code*`/`local-agent-mode-sessions`), so each profile keeps its own
-  login and session state. Existing files are backed up to `*.bak` before
-  being replaced with a symlink, and re-running is idempotent.
 
 ## Changelog
 
