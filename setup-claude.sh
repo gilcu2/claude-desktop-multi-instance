@@ -4,13 +4,20 @@
 # so you can run several accounts at once and tell them apart.
 #
 # Usage:
-#   ./setup-claude.sh <name> [tint-hex] [badge-letter]
+#   ./setup-claude.sh <name> [tint-hex] [badge-letter] [badge-color-hex]
 #
-#   <name>         Profile name. Shown as "Claude <name>". Required.
-#                  e.g. Work, Home, Personal, "Client A"
-#   [tint-hex]     Icon tint, 6-digit hex (with or without #). Default: 4A7CFE.
-#                  e.g. FF8C42 (orange), 4A7CFE (blue), 34C759 (green)
-#   [badge-letter] One character drawn on the icon. Default: first letter of name.
+#   <name>            Profile name. Shown as "Claude <name>". Required.
+#                     e.g. Work, Home, Personal, "Client A"
+#   [tint-hex]        Icon tint, 6-digit hex (with or without #). Default: 4A7CFE.
+#                     e.g. FF8C42 (orange), 4A7CFE (blue), 34C759 (green)
+#   [badge-letter]    One character drawn on the icon. Default: first letter of name.
+#   [badge-color-hex] Fill color for the badge circle, 6-digit hex. Default: a
+#                     darker shade of tint-hex (~55%).
+#   [tint-strength]   How strongly tint-hex is blended over the icon, 0-1.
+#                     Default: 0.35. Cool colors (blue/green) fight the stock
+#                     icon's warm orange background and need a higher value
+#                     (~0.6+) to read as a strong, saturated color instead of
+#                     a muted/purple blend.
 #
 # What it does (and why each step is needed):
 #   * APFS-clones /Applications/Claude.app (instant, copy-on-write). The real
@@ -40,9 +47,11 @@ set -e
 NAME="$1"
 TINT_HEX="${2:-4A7CFE}"
 BADGE_LETTER="$3"
+BADGE_COLOR_HEX="$4"
+TINT_STRENGTH="${5:-0.35}"
 
 if [ -z "$NAME" ]; then
-  echo "Usage: $0 <name> [tint-hex] [badge-letter]"
+  echo "Usage: $0 <name> [tint-hex] [badge-letter] [badge-color-hex]"
   echo "  e.g. $0 Work FF8C42 W"
   exit 1
 fi
@@ -60,14 +69,29 @@ COPY_APP="$HOME/Applications/${DISPLAY_NAME}.app"
 LSREG="/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# Parse hex tint -> R G B, derive a darker badge fill (~55%).
+# Parse hex tint -> R G B, derive a darker badge fill (~55%) unless overridden.
 TINT_HEX="${TINT_HEX#\#}"
 if ! echo "$TINT_HEX" | grep -qiE '^[0-9a-f]{6}$'; then
   echo "Error: tint-hex '$TINT_HEX' must be 6 hex digits (e.g. FF8C42)."
   exit 1
 fi
 TR=$((16#${TINT_HEX:0:2})); TG=$((16#${TINT_HEX:2:2})); TB=$((16#${TINT_HEX:4:2}))
-FR=$((TR * 55 / 100)); FG=$((TG * 55 / 100)); FB=$((TB * 55 / 100))
+
+if ! echo "$TINT_STRENGTH" | grep -qE '^0(\.[0-9]+)?$|^1(\.0+)?$'; then
+  echo "Error: tint-strength '$TINT_STRENGTH' must be a number between 0 and 1."
+  exit 1
+fi
+
+BADGE_COLOR_HEX="${BADGE_COLOR_HEX#\#}"
+if [ -n "$BADGE_COLOR_HEX" ]; then
+  if ! echo "$BADGE_COLOR_HEX" | grep -qiE '^[0-9a-f]{6}$'; then
+    echo "Error: badge-color-hex '$BADGE_COLOR_HEX' must be 6 hex digits (e.g. FF8C42)."
+    exit 1
+  fi
+  FR=$((16#${BADGE_COLOR_HEX:0:2})); FG=$((16#${BADGE_COLOR_HEX:2:2})); FB=$((16#${BADGE_COLOR_HEX:4:2}))
+else
+  FR=$((TR * 55 / 100)); FG=$((TG * 55 / 100)); FB=$((TB * 55 / 100))
+fi
 
 if [ ! -d "$SRC_APP" ]; then
   echo "Error: $SRC_APP not found. Is Claude Desktop installed?"
@@ -127,7 +151,7 @@ for path in glob.glob(os.path.join(src_dir, "*.png")):
     w, h = img.size
     alpha = img.split()[3]
     overlay = Image.new("RGBA", (w, h), tint)
-    tinted = Image.blend(img, overlay, 0.35)
+    tinted = Image.blend(img, overlay, $TINT_STRENGTH)
     tinted.putalpha(alpha)
     badge_d = max(int(w * 0.42), 12)
     badge_img = Image.new("RGBA", (badge_d, badge_d), (0, 0, 0, 0))
@@ -149,6 +173,11 @@ PYEOF
     iconutil -c icns "$WORKDIR/orig.iconset" -o "$NEW_ICON_PATH"
     rm -f "$SRC_ICON_PATH"
     /usr/libexec/PlistBuddy -c "Set :CFBundleIconFile $NEW_ICON" "$PL"
+    # CFBundleIconName (present on modern Electron builds) points at the
+    # asset catalog (Assets.car), which we don't touch and is identical
+    # across every clone. macOS prefers it over CFBundleIconFile when both
+    # exist, so it must be removed or Finder/Dock silently ignore our icon.
+    /usr/libexec/PlistBuddy -c "Delete :CFBundleIconName" "$PL" 2>/dev/null || true
   else
     echo "      Note: couldn't decompose $SRC_ICON — leaving icon untinted."
   fi

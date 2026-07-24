@@ -12,10 +12,9 @@ title, and data directory. It never modifies the original installed app.
 ## Commands
 
 ```bash
-./setup-claude.sh <name> [tint-hex] [badge-letter]   # build/rebuild a profile
+./setup-claude.sh <name> [tint-hex] [badge-letter] [badge-color-hex] [tint-strength]   # build/rebuild a profile
 ./setup-claude-work.sh                                # preset: Work, orange, "W"
 ./setup-claude-home.sh                                # preset: Home, blue, "H"
-./share-claude-config.sh <name> <name> [more...]      # symlink select config between profiles
 ./build-changelog.sh <version>                        # collect newsfragments/ into CHANGELOG.md
 npm install                                           # installs @electron/asar (used by patch-title.js)
 ```

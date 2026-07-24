@@ -1,6 +1,6 @@
 {
   "name": "claude-desktop-multi-instance",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Run multiple Claude Desktop accounts side by side on macOS, each with its own name, icon, and window title.",
   "license": "MIT",
   "type": "commonjs",
